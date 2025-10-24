@@ -1,5 +1,5 @@
 /*
- *    Copyright 2023 The ChampSim Contributors
+ * Copyright 2023 The ChampSim Contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -150,6 +150,51 @@ private:
   std::deque<tag_lookup_type> translation_stash{};
 
 public:
+  // -------- Hybrid LLC knobs (apply only when NAME == "LLC") --------
+  bool hybrid_enable = false;
+  double pi_way   = 0.0;  // reserved for future way partition enforcement
+  double pi_read  = 0.0;  // fraction of read hits *targeting* MRAM (used for migration heuristics later)
+  double pi_write = 0.0;  // fraction of write hits *targeting* MRAM
+  double pi_miss  = 0.0;  // fraction of fills that install in MRAM
+
+  // (Optional) latencies you will use in *offline* timing/energy post-processing
+  uint32_t t_sram_hit_cycles = 16;
+  uint32_t t_mram_rd_cycles  = 28;
+  uint32_t t_mram_wr_cycles  = 60;
+
+  // Cumulative per-medium counters (we'll print them at end_phase)
+  uint64_t hyb_hit_sram_rd = 0;
+  uint64_t hyb_hit_sram_wr = 0;
+  uint64_t hyb_hit_mram_rd = 0;
+  uint64_t hyb_hit_mram_wr = 0;
+  uint64_t hyb_miss_rd     = 0;
+  uint64_t hyb_miss_wr     = 0;
+  uint64_t hyb_fill_sram   = 0;
+  uint64_t hyb_fill_mram   = 0;
+
+  // Configure from CLI once
+  void set_hybrid_knobs(bool enable, double pway, double pread, double pwrite, double pmiss,
+                        uint32_t tS, uint32_t tMr, uint32_t tMw)
+  {
+    hybrid_enable       = enable;
+    pi_way              = pway;
+    pi_read             = pread;
+    pi_write            = pwrite;
+    pi_miss             = pmiss;
+    t_sram_hit_cycles   = tS;
+    t_mram_rd_cycles    = tMr;
+    t_mram_wr_cycles    = tMw;
+  }
+
+  // Dump simple hybrid stats for this cache
+  void print_hybrid_stats() const
+  {
+    if (!hybrid_enable) return;
+    fmt::print("[{}][HYB] SRAM_HIT_RD:{} SRAM_HIT_WR:{} MRAM_HIT_RD:{} MRAM_HIT_WR:{} MISS_RD:{} MISS_WR:{} FILL_SRAM:{} FILL_MRAM:{}\n",
+              NAME, hyb_hit_sram_rd, hyb_hit_sram_wr, hyb_hit_mram_rd, hyb_hit_mram_wr,
+              hyb_miss_rd, hyb_miss_wr, hyb_fill_sram, hyb_fill_mram);
+  }
+
   std::vector<channel_type*> upper_levels;
   channel_type* lower_level;
   channel_type* lower_translate;
@@ -187,7 +232,7 @@ public:
   [[deprecated("get_occupancy() returns 0 for every input except 0 (MSHR). Use get_mshr_occupancy() instead.")]] std::size_t
   get_occupancy(uint8_t queue_type, uint64_t address) const;
   [[deprecated("get_size() returns 0 for every input except 0 (MSHR). Use get_mshr_size() instead.")]] std::size_t get_size(uint8_t queue_type,
-                                                                                                                            uint64_t address) const;
+                                                                                                                         uint64_t address) const;
   // NOLINTEND
 
   [[nodiscard]] std::size_t get_mshr_occupancy() const;
@@ -307,7 +352,7 @@ public:
 
   void impl_initialize_replacement() const;
   [[nodiscard]] long impl_find_victim(uint32_t triggering_cpu, uint64_t instr_id, long set, const BLOCK* current_set, champsim::address ip,
-                                      champsim::address full_addr, access_type type) const;
+                                        champsim::address full_addr, access_type type) const;
   void impl_update_replacement_state(uint32_t triggering_cpu, long set, long way, champsim::address full_addr, champsim::address ip,
                                      champsim::address victim_addr, access_type type, bool hit) const;
   void impl_replacement_cache_fill(uint32_t triggering_cpu, long set, long way, champsim::address full_addr, champsim::address ip,
@@ -406,6 +451,7 @@ void CACHE::prefetcher_module_model<Ps...>::impl_prefetcher_final_stats()
       p.prefetcher_final_stats();
   };
 
+
   std::apply([&](auto&... p) { (..., process_one(p)); }, intern_);
 }
 
@@ -449,7 +495,7 @@ long CACHE::replacement_module_model<Rs...>::impl_find_victim(uint32_t triggerin
 
     /* Raw integer addresses */
     if constexpr (replacement::has_find_victim<decltype(r), uint32_t, uint64_t, long, const BLOCK*, champsim::address, champsim::address,
-                                               std::underlying_type_t<access_type>>)
+                                              std::underlying_type_t<access_type>>)
       return return_type{r.find_victim(triggering_cpu, instr_id, set, current_set, ip, full_addr, champsim::to_underlying(type))};
 
     /* Raw integer addresses, raw integer access type */

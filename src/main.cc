@@ -1,5 +1,5 @@
 /*
- *    Copyright 2023 The ChampSim Contributors
+ * Copyright 2023 The ChampSim Contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -63,6 +63,10 @@ int main(int argc, char** argv) // NOLINT(bugprone-exception-escape)
   long long simulation_instructions = std::numeric_limits<long long>::max();
   std::string json_file_name;
   std::vector<std::string> trace_names;
+  // Hybrid-LLC CLI knobs
+  bool     hyb_enable = false;
+  double   opt_pi_way = 0.0, opt_pi_read = 0.0, opt_pi_write = 0.0, opt_pi_miss = 0.0;
+  uint32_t opt_tS = 16, opt_tMr = 28, opt_tMw = 60;
 
   auto set_heartbeat_callback = [&](auto) {
     for (O3_CPU& cpu : gen_environment.cpu_view()) {
@@ -76,12 +80,23 @@ int main(int argc, char** argv) // NOLINT(bugprone-exception-escape)
   auto* deprec_warmup_instr_option =
       app.add_option("--warmup_instructions", warmup_instructions, "[deprecated] use --warmup-instructions instead")->excludes(warmup_instr_option);
   auto* sim_instr_option = app.add_option("-i,--simulation-instructions", simulation_instructions,
-                                          "The number of instructions in the detailed phase. If not specified, run to the end of the trace.");
+                                        "The number of instructions in the detailed phase. If not specified, run to the end of the trace.");
   auto* deprec_sim_instr_option =
       app.add_option("--simulation_instructions", simulation_instructions, "[deprecated] use --simulation-instructions instead")->excludes(sim_instr_option);
 
   auto* json_option =
       app.add_option("--json", json_file_name, "The name of the file to receive JSON output. If no name is specified, stdout will be used")->expected(0, 1);
+
+  // Hybrid flags
+  app.add_flag("--hybrid-llc", hyb_enable, "Enable SRAM/MRAM tagging and hybrid stats on the LLC");
+  app.add_option("--pi-way",   opt_pi_way,   "MRAM way fraction [0..1] (reserved; not enforced yet)")
+     ->check(CLI::Range(0.0, 1.0));
+  app.add_option("--pi-read",  opt_pi_read,  "Target fraction of read hits in MRAM [0..1]")->check(CLI::Range(0.0, 1.0));
+  app.add_option("--pi-write", opt_pi_write, "Target fraction of write hits in MRAM [0..1]")->check(CLI::Range(0.0, 1.0));
+  app.add_option("--pi-miss",  opt_pi_miss,  "Fraction of fills that install in MRAM [0..1]")->check(CLI::Range(0.0, 1.0));
+  app.add_option("--t-sram-hit", opt_tS,  "SRAM hit cycles (for offline accounting)")->check(CLI::PositiveNumber);
+  app.add_option("--t-mram-rd",  opt_tMr, "MRAM read hit cycles (offline)")->check(CLI::PositiveNumber);
+  app.add_option("--t-mram-wr",  opt_tMw, "MRAM write hit cycles (offline)")->check(CLI::PositiveNumber);
 
   app.add_option("traces", trace_names, "The paths to the traces")->required()->expected(NUM_CPUS)->check(CLI::ExistingFile);
 
@@ -119,6 +134,18 @@ int main(int argc, char** argv) // NOLINT(bugprone-exception-escape)
 
   fmt::print("\n*** ChampSim Multicore Out-of-Order Simulator ***\nWarmup Instructions: {}\nSimulation Instructions: {}\nNumber of CPUs: {}\nPage size: {}\n\n",
              phases.at(0).length, phases.at(1).length, std::size(gen_environment.cpu_view()), PAGE_SIZE);
+
+  // Apply knobs to the LLC cache instance(s)
+  if (hyb_enable) {
+    for (CACHE& c : gen_environment.cache_view()) {
+      if (c.NAME == "LLC") {
+        c.set_hybrid_knobs(true, opt_pi_way, opt_pi_read, opt_pi_write, opt_pi_miss,
+                           opt_tS, opt_tMr, opt_tMw);
+        fmt::print("[LLC][HYB] enabled pi_way={} pi_read={} pi_write={} pi_miss={} tS={} tMr={} tMw={}\n",
+                   opt_pi_way, opt_pi_read, opt_pi_write, opt_pi_miss, opt_tS, opt_tMr, opt_tMw);
+      }
+    }
+  }
 
   auto phase_stats = champsim::main(gen_environment, phases, traces);
 

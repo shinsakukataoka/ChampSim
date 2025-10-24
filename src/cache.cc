@@ -180,7 +180,7 @@ bool CACHE::handle_fill(const mshr_type& fill_mshr)
   assert(set_begin <= way);
   assert(way <= set_end);
   assert(way != set_end || fill_mshr.type != access_type::WRITE); // Writes may not bypass
-  const auto way_idx = std::distance(set_begin, way);             // cast protected by earlier assertion
+  const auto way_idx = std::distance(set_begin, way);              // cast protected by earlier assertion
 
   if constexpr (champsim::debug_print) {
     fmt::print("[{}] {} instr_id: {} address: {} v_address: {} set: {} way: {} type: {} prefetch_metadata: {} cycle_enqueued: {} cycle: {}\n", NAME, __func__,
@@ -231,7 +231,23 @@ bool CACHE::handle_fill(const mshr_type& fill_mshr)
       ++sim_stats.pf_fill;
     }
 
+    // Decide medium for this fill
+    bool fill_to_mram = false;
+    if (hybrid_enable && NAME == "LLC") {
+      // Simple deterministic pseudo-random using address bits to approximate ratio pi_miss
+      // (avoids bringing in RNG; stable across runs)
+      // threshold in [0..65535]
+      const uint32_t thr = static_cast<uint32_t>(pi_miss * 65535.0);
+      const uint64_t line = module_address(fill_mshr).to<uint64_t>();
+      const uint32_t hash = static_cast<uint32_t>((line >> 6) ^ (line >> 23) ^ (line >> 41)) & 0xFFFFu;
+      fill_to_mram = (hash <= thr);
+    }
+
     *way = fill_block(fill_mshr, metadata_thru);
+    way->is_mram = fill_to_mram;
+    if (hybrid_enable && NAME == "LLC") {
+      if (fill_to_mram) ++hyb_fill_mram; else ++hyb_fill_sram;
+    }
   }
 
   // COLLECT STATS
@@ -274,6 +290,16 @@ bool CACHE::try_hit(const tag_lookup_type& handle_pkt)
                                 hit);
 
   if (hit) {
+    // Hybrid per-medium hit counters (LLC only)
+    if (hybrid_enable && NAME == "LLC") {
+      const bool wr = (handle_pkt.type == access_type::WRITE);
+      if (way->is_mram) {
+        if (wr) ++hyb_hit_mram_wr; else ++hyb_hit_mram_rd;
+      } else {
+        if (wr) ++hyb_hit_sram_wr; else ++hyb_hit_sram_rd;
+      }
+    }
+
     sim_stats.hits.increment(std::pair{handle_pkt.type, handle_pkt.cpu});
 
     response_type response{handle_pkt.address, handle_pkt.v_address, way->data, metadata_thru, handle_pkt.instr_depend_on_me};
@@ -367,6 +393,10 @@ bool CACHE::handle_miss(const tag_lookup_type& handle_pkt)
   }
 
   sim_stats.misses.increment(std::pair{handle_pkt.type, handle_pkt.cpu});
+  if (hybrid_enable && NAME == "LLC") {
+    if (handle_pkt.type == access_type::WRITE) ++hyb_miss_wr;
+    else                                      ++hyb_miss_rd;
+  }
 
   return true;
 }
@@ -860,7 +890,14 @@ void CACHE::begin_phase()
     ul->roi_stats = ul_new_roi_stats;
     ul->sim_stats = ul_new_sim_stats;
   }
+
+  // reset hybrid counters each phase
+  hyb_hit_sram_rd = hyb_hit_sram_wr = 0;
+  hyb_hit_mram_rd = hyb_hit_mram_wr = 0;
+  hyb_miss_rd = hyb_miss_wr = 0;
+  hyb_fill_sram = hyb_fill_mram = 0;
 }
+
 
 void CACHE::end_phase(unsigned finished_cpu)
 {
@@ -895,6 +932,9 @@ void CACHE::end_phase(unsigned finished_cpu)
     ul->roi_stats.WQ_TO_CACHE = ul->sim_stats.WQ_TO_CACHE;
     ul->roi_stats.WQ_FORWARD = ul->sim_stats.WQ_FORWARD;
   }
+
+  // Print our hybrid counters for this cache
+  print_hybrid_stats();
 }
 
 template <typename T>
@@ -934,3 +974,4 @@ void CACHE::print_deadlock()
   }
 }
 // LCOV_EXCL_STOP
+

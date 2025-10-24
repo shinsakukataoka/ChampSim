@@ -29,7 +29,7 @@ struct cache_block {
   champsim::address address{};
   champsim::address v_address{};
   champsim::address data{};
-
+  bool is_mram = false;
   uint32_t pf_metadata = 0;
 };
 } // namespace champsim
