@@ -1,0 +1,15 @@
+{
+  "stable_windows": [
+    2,
+    0,
+    10,
+    13,
+    3
+  ],
+  "representatives": [
+    13,
+    2,
+    0
+  ],
+  "n_clusters": 3
+}

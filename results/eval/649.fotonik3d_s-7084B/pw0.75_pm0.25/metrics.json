@@ -1,0 +1,29 @@
+{
+  "stall_cycles": 334985.454873437,
+  "window_cycles_sum": 553722.0,
+  "stall_pct": 0.6049704632892263,
+  "E_dynamic_J": 1.4117200000000001e-05,
+  "E_leakage_J": 7.1983860000000004e-06,
+  "E_total_J": 2.1315586e-05,
+  "bench": "649.fotonik3d_s-7084B",
+  "tag": "pw0.75_pm0.25",
+  "pi_way": 0.75,
+  "pi_miss": 0.25,
+  "t_sram_hit": 16.0,
+  "t_mram_rd": 28.0,
+  "t_mram_wr": 60.0,
+  "t_dram": 178.7,
+  "l3_mb": 8.0,
+  "roi_cycles": 9896520,
+  "rep_windows_char": [
+    12,
+    35,
+    52
+  ],
+  "rep_windows_mapped": [
+    13,
+    36,
+    53
+  ],
+  "rep_rows": 3
+}

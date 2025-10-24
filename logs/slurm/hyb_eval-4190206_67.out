@@ -1,0 +1,3 @@
+TASK 67: 631.deepsjeng_s-928B pw=0.5 pm=0.25 tag=pw0.50_pm0.25
+[eval_design] wrote results/eval/631.deepsjeng_s-928B/pw0.50_pm0.25/metrics.json
+  stall%=56.59  E_total=2.101e-05 J  (rep_rows=3)

@@ -1,0 +1,3 @@
+TASK 51: 657.xz_s-3167B pw=0.5 pm=0.75 tag=pw0.50_pm0.75
+[eval_design] wrote results/eval/657.xz_s-3167B/pw0.50_pm0.75/metrics.json
+  stall%=49.82  E_total=2.005e-05 J  (rep_rows=3)

@@ -1,0 +1,2 @@
+stall_cycles,window_cycles_sum,stall_pct,E_dynamic_J,E_leakage_J,E_total_J,bench,tag,pi_way,pi_miss,t_sram_hit,t_mram_rd,t_mram_wr,t_dram,l3_mb,roi_cycles,rep_windows_char,rep_windows_mapped,rep_rows
+895410.2120442959,600000.0,1.4923503534071598,2.4271200000000002e-05,7.8e-06,3.20712e-05,620.omnetpp_s-874B,pw0.75_pm0.25,0.75,0.25,16.0,28.0,60.0,151.3,8.0,19454352,"[48, 80, 3]","[52, 87, 3]",3

@@ -1,0 +1,2 @@
+stall_cycles,window_cycles_sum,stall_pct,E_dynamic_J,E_leakage_J,E_total_J,bench,tag,pi_way,pi_miss,t_sram_hit,t_mram_rd,t_mram_wr,t_dram,l3_mb,roi_cycles,rep_windows_char,rep_windows_mapped,rep_rows
+73888.57565486047,600000.0,0.12314762609143412,4.6434e-06,1.8599999999999998e-05,2.32434e-05,623.xalancbmk_s-700B,pw0.25_pm0.25,0.25,0.25,16.0,28.0,60.0,180.1,8.0,4587339,"[7, 17, 19]","[8, 19, 21]",3

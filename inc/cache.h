@@ -33,6 +33,7 @@
 #include <string>
 #include <type_traits>
 #include <vector>
+#include <cstdio>
 
 #include "address.h"
 #include "bandwidth.h"
@@ -172,7 +173,39 @@ public:
   uint64_t hyb_fill_sram   = 0;
   uint64_t hyb_fill_mram   = 0;
 
-  // Configure from CLI once
+  // --- Per-set way pools for partitioned victim selection (LLC only) ---
+  std::vector<std::vector<int>> mram_way_ids;  // for each set: list of MRAM ways
+  std::vector<std::vector<int>> sram_way_ids;  // for each set: list of SRAM ways
+
+  // -------- Per-window logging (LLC only; cycles-based windows) --------
+  // window configuration (cycles)
+  uint64_t win_cycle_len = 200000;   // default 200k cycles per window
+  uint64_t next_win_end_cycle = 0;
+  bool     win_active = false;
+  uint64_t win_id = 0;
+  uint64_t win_start_cycle = 0, win_end_cycle = 0;
+  uint64_t win_start_inst  = 0, win_end_inst  = 0; // keep 0 (we're not wiring retired-instr windows)
+
+  // per-window counters
+  uint64_t win_hit_sram_rd=0, win_hit_sram_wr=0, win_hit_mram_rd=0, win_hit_mram_wr=0;
+  uint64_t win_miss_rd=0, win_miss_wr=0;
+
+  // miss intervals for MLP
+  struct miss_rec { uint64_t arrive, complete; champsim::address line; };
+  std::vector<miss_rec> win_misses;
+
+  // hit overlap
+  uint64_t inflight_hits=0, sum_inflight_hits=0, hit_cover_cycles=0;
+  std::deque<uint64_t> inflight_hit_retire_cycles;
+
+  // CSV file
+  FILE* win_csv = nullptr;
+
+  // APIs
+  void hybrid_begin_window(uint64_t start_cycle, uint64_t start_inst);
+  void hybrid_end_window(uint64_t end_cycle, uint64_t end_inst);
+
+  // --- Public helpers to configure & print the hybrid stats (needed by main.cc) ---
   void set_hybrid_knobs(bool enable, double pway, double pread, double pwrite, double pmiss,
                         uint32_t tS, uint32_t tMr, uint32_t tMw)
   {
@@ -186,7 +219,6 @@ public:
     t_mram_wr_cycles    = tMw;
   }
 
-  // Dump simple hybrid stats for this cache
   void print_hybrid_stats() const
   {
     if (!hybrid_enable) return;
@@ -561,6 +593,7 @@ void CACHE::replacement_module_model<Rs...>::impl_replacement_cache_fill(uint32_
       impl_update_replacement_state(triggering_cpu, set, way, full_addr, ip, victim_addr, type, false);
   };
 
+
   std::apply([&](auto&... r) { (..., process_one(r)); }, intern_);
 }
 
@@ -582,3 +615,4 @@ void CACHE::replacement_module_model<Rs...>::impl_replacement_final_stats()
 #endif
 
 #endif
+

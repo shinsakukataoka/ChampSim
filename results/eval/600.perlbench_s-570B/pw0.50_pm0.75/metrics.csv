@@ -1,0 +1,2 @@
+stall_cycles,window_cycles_sum,stall_pct,E_dynamic_J,E_leakage_J,E_total_J,bench,tag,pi_way,pi_miss,t_sram_hit,t_mram_rd,t_mram_wr,t_dram,l3_mb,roi_cycles,rep_windows_char,rep_windows_mapped,rep_rows
+145301.78921382065,486524.0,0.29865287059594314,3.807e-06,1.0703528e-05,1.4510528e-05,600.perlbench_s-570B,pw0.50_pm0.75,0.5,0.75,16.0,28.0,60.0,171.9,8.0,2320462,"[13, 2, 0]","[15, 2, 0]",3

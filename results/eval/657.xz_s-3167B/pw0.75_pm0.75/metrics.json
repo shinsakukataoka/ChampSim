@@ -1,0 +1,29 @@
+{
+  "stall_cycles": 304071.5195366893,
+  "window_cycles_sum": 590956.0,
+  "stall_pct": 0.5145417248267034,
+  "E_dynamic_J": 6.7774e-06,
+  "E_leakage_J": 7.682428000000001e-06,
+  "E_total_J": 1.4459828e-05,
+  "bench": "657.xz_s-3167B",
+  "tag": "pw0.75_pm0.75",
+  "pi_way": 0.75,
+  "pi_miss": 0.75,
+  "t_sram_hit": 16.0,
+  "t_mram_rd": 28.0,
+  "t_mram_wr": 60.0,
+  "t_dram": 174.4,
+  "l3_mb": 8.0,
+  "roi_cycles": 5655316,
+  "rep_windows_char": [
+    30,
+    23,
+    22
+  ],
+  "rep_windows_mapped": [
+    32,
+    25,
+    24
+  ],
+  "rep_rows": 3
+}

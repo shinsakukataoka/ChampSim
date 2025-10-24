@@ -1,0 +1,29 @@
+{
+  "stall_cycles": 299305.68913152337,
+  "window_cycles_sum": 555846.0,
+  "stall_pct": 0.5384687289852286,
+  "E_dynamic_J": 7.65e-06,
+  "E_leakage_J": 1.7231226e-05,
+  "E_total_J": 2.4881226e-05,
+  "bench": "641.leela_s-1083B",
+  "tag": "pw0.25_pm0.50",
+  "pi_way": 0.25,
+  "pi_miss": 0.5,
+  "t_sram_hit": 16.0,
+  "t_mram_rd": 28.0,
+  "t_mram_wr": 60.0,
+  "t_dram": 155.0,
+  "l3_mb": 8.0,
+  "roi_cycles": 3748976,
+  "rep_windows_char": [
+    2,
+    0,
+    4
+  ],
+  "rep_windows_mapped": [
+    2,
+    0,
+    5
+  ],
+  "rep_rows": 3
+}

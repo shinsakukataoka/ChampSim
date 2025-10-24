@@ -1,0 +1,3 @@
+TASK 8: 600.perlbench_s-570B pw=0.75 pm=0.5 tag=pw0.75_pm0.50
+[eval_design] wrote results/eval/600.perlbench_s-570B/pw0.75_pm0.50/metrics.json
+  stall%=29.87  E_total=1.013e-05 J  (rep_rows=3)

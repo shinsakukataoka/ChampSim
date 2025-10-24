@@ -1,0 +1,2 @@
+window_id,start_cycle,end_cycle,start_inst,end_inst,hit_sram_rd,hit_sram_wr,hit_mram_rd,hit_mram_wr,miss_rd,miss_wr,sum_lat_miss,cover_time_miss,mlp_miss,sum_inflight_hits,hit_cover_cycles,mlp_hit
+0,1,200001,0,0,0,313,0,255,10092,0,18739,17618,1.063628,0,0,1.000000

@@ -1,0 +1,17 @@
+Traceback (most recent call last):
+  File "/home/skataoka26/ChampSim/tools/hybrid/eval_design.py", line 162, in <module>
+    main()
+  File "/home/skataoka26/ChampSim/tools/hybrid/eval_design.py", line 127, in main
+    rc, logtxt = run_cmd(cmd, log_path, cwd=run_cwd)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/skataoka26/ChampSim/tools/hybrid/eval_design.py", line 20, in run_cmd
+    p = subprocess.run(cmd, stdout=lf, stderr=subprocess.STDOUT, text=True, cwd=cwd)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/skataoka26/miniconda3/lib/python3.12/subprocess.py", line 548, in run
+    with Popen(*popenargs, **kwargs) as process:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/skataoka26/miniconda3/lib/python3.12/subprocess.py", line 1026, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+  File "/home/skataoka26/miniconda3/lib/python3.12/subprocess.py", line 1953, in _execute_child
+    raise child_exception_type(errno_num, err_msg, err_filename)
+FileNotFoundError: [Errno 2] No such file or directory: 'bin/champsim'

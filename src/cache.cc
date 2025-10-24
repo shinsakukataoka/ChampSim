@@ -22,6 +22,7 @@
 #include <iomanip>
 #include <numeric>
 #include <fmt/core.h>
+#include <filesystem>
 
 #include "bandwidth.h"
 #include "champsim.h"
@@ -170,28 +171,79 @@ bool CACHE::handle_fill(const mshr_type& fill_mshr)
 {
   cpu = fill_mshr.cpu;
 
-  // find victim
+  // Identify set span and index
   auto [set_begin, set_end] = get_set_span(fill_mshr.address);
-  auto way = std::find_if_not(set_begin, set_end, [](auto x) { return x.valid; });
-  if (way == set_end) {
-    way = std::next(set_begin, impl_find_victim(fill_mshr.cpu, fill_mshr.instr_id, get_set_index(fill_mshr.address), &*set_begin, fill_mshr.ip,
-                                                fill_mshr.address, fill_mshr.type));
+  const long set_idx = get_set_index(fill_mshr.address);
+
+  // Decide medium for this fill (MRAM vs SRAM) up-front so we can restrict the victim pool
+  bool fill_to_mram = false;
+  if (hybrid_enable && NAME == "LLC") {
+    // deterministic pseudo-random based on line address vs pi_miss
+    const uint32_t thr = static_cast<uint32_t>(pi_miss * 65535.0);
+    const uint64_t line = module_address(fill_mshr).to<uint64_t>();
+    const uint32_t hash = static_cast<uint32_t>((line >> 6) ^ (line >> 23) ^ (line >> 41)) & 0xFFFFu;
+    fill_to_mram = (hash <= thr);
   }
-  assert(set_begin <= way);
-  assert(way <= set_end);
+
+  // Choose victim, enforcing pool if hybrid LLC
+  set_type::iterator way = set_end;
+  long way_idx = -1;
+
+  auto pick_default_victim = [&]() {
+    auto w = std::find_if_not(set_begin, set_end, [](auto x) { return x.valid; });
+    if (w == set_end) {
+      long repl = impl_find_victim(fill_mshr.cpu, fill_mshr.instr_id, set_idx, &*set_begin, fill_mshr.ip, fill_mshr.address, fill_mshr.type);
+      w = std::next(set_begin, repl);
+    }
+    return w;
+  };
+
+  if (hybrid_enable && NAME == "LLC" && !mram_way_ids.empty()) {
+    const auto& pool = fill_to_mram ? mram_way_ids[set_idx] : sram_way_ids[set_idx];
+
+    // 1) Prefer an invalid line within the pool
+    for (int w : pool) {
+      auto it = std::next(set_begin, w);
+      if (!it->valid) { way = it; way_idx = w; break; }
+    }
+
+    // 2) Otherwise, ask replacement policy; use it if it's inside the pool
+    if (way == set_end) {
+      auto def = pick_default_victim();
+      long def_idx = std::distance(set_begin, def);
+      bool in_pool = std::find(pool.begin(), pool.end(), def_idx) != pool.end();
+      if (in_pool) { way = def; way_idx = def_idx; }
+    }
+
+    // 3) Otherwise, fall back to the first way in the pool
+    if (way == set_end) {
+      int w = pool.front();
+      way = std::next(set_begin, w);
+      way_idx = w;
+    }
+  } else {
+    // Non-hybrid path: original victim logic
+    way = pick_default_victim();
+    way_idx = std::distance(set_begin, way);
+  }
+
+  // Sanity
+  assert(set_begin <= way && way <= set_end);
   assert(way != set_end || fill_mshr.type != access_type::WRITE); // Writes may not bypass
-  const auto way_idx = std::distance(set_begin, way);              // cast protected by earlier assertion
 
   if constexpr (champsim::debug_print) {
-    fmt::print("[{}] {} instr_id: {} address: {} v_address: {} set: {} way: {} type: {} prefetch_metadata: {} cycle_enqueued: {} cycle: {}\n", NAME, __func__,
-               fill_mshr.instr_id, fill_mshr.address, fill_mshr.v_address, get_set_index(fill_mshr.address), way_idx,
-               access_type_names.at(champsim::to_underlying(fill_mshr.type)), fill_mshr.data_promise->pf_metadata,
-               (fill_mshr.time_enqueued.time_since_epoch()) / clock_period, (current_time.time_since_epoch()) / clock_period);
+    fmt::print("[{}] {} instr_id: {} address: {} v_address: {} set: {} way: {} type: {} cycle_enqueued: {} cycle: {}\n",
+               NAME, __func__,
+               fill_mshr.instr_id, fill_mshr.address, fill_mshr.v_address,
+               get_set_index(fill_mshr.address), way_idx,
+               access_type_names.at(champsim::to_underlying(fill_mshr.type)),
+               (fill_mshr.time_enqueued.time_since_epoch()) / clock_period,
+               (current_time.time_since_epoch()) / clock_period);
   }
 
+  // Writeback if needed
   if (way != set_end && way->valid && way->dirty) {
     request_type writeback_packet;
-
     writeback_packet.cpu = fill_mshr.cpu;
     writeback_packet.address = way->address;
     writeback_packet.data = way->data;
@@ -200,11 +252,6 @@ bool CACHE::handle_fill(const mshr_type& fill_mshr)
     writeback_packet.type = access_type::WRITE;
     writeback_packet.pf_metadata = way->pf_metadata;
     writeback_packet.response_requested = false;
-
-    if constexpr (champsim::debug_print) {
-      fmt::print("[{}] {} evict address: {} v_address: {} prefetch_metadata: {}\n", NAME, __func__, writeback_packet.address, writeback_packet.v_address,
-                 fill_mshr.data_promise->pf_metadata);
-    }
 
     auto success = lower_level->add_wq(writeback_packet);
     if (!success) {
@@ -217,42 +264,52 @@ bool CACHE::handle_fill(const mshr_type& fill_mshr)
     evicting_address = module_address(*way);
   }
 
-  auto metadata_thru = impl_prefetcher_cache_fill(module_address(fill_mshr), get_set_index(fill_mshr.address), way_idx,
-                                                  (fill_mshr.type == access_type::PREFETCH), evicting_address, fill_mshr.data_promise->pf_metadata);
-  impl_replacement_cache_fill(fill_mshr.cpu, get_set_index(fill_mshr.address), way_idx, module_address(fill_mshr), fill_mshr.ip, evicting_address,
+  // Notify modules about the fill position
+  auto metadata_thru = impl_prefetcher_cache_fill(module_address(fill_mshr),
+                                                  get_set_index(fill_mshr.address),
+                                                  way_idx,
+                                                  (fill_mshr.type == access_type::PREFETCH),
+                                                  evicting_address,
+                                                  fill_mshr.data_promise->pf_metadata);
+
+  impl_replacement_cache_fill(fill_mshr.cpu,
+                              get_set_index(fill_mshr.address),
+                              way_idx,
+                              module_address(fill_mshr),
+                              fill_mshr.ip,
+                              evicting_address,
                               fill_mshr.type);
 
   if (way != set_end) {
     if (way->valid && way->prefetch) {
       ++sim_stats.pf_useless;
     }
-
     if (fill_mshr.type == access_type::PREFETCH) {
       ++sim_stats.pf_fill;
     }
 
-    // Decide medium for this fill
-    bool fill_to_mram = false;
-    if (hybrid_enable && NAME == "LLC") {
-      // Simple deterministic pseudo-random using address bits to approximate ratio pi_miss
-      // (avoids bringing in RNG; stable across runs)
-      // threshold in [0..65535]
-      const uint32_t thr = static_cast<uint32_t>(pi_miss * 65535.0);
-      const uint64_t line = module_address(fill_mshr).to<uint64_t>();
-      const uint32_t hash = static_cast<uint32_t>((line >> 6) ^ (line >> 23) ^ (line >> 41)) & 0xFFFFu;
-      fill_to_mram = (hash <= thr);
-    }
-
+    // Fill the line and tag medium
     *way = fill_block(fill_mshr, metadata_thru);
-    way->is_mram = fill_to_mram;
+    way->is_mram = (hybrid_enable && NAME == "LLC") ? fill_to_mram : false;
+
+    // Hybrid fill counters
     if (hybrid_enable && NAME == "LLC") {
-      if (fill_to_mram) ++hyb_fill_mram; else ++hyb_fill_sram;
+      if (fill_to_mram) ++hyb_fill_mram;
+      else              ++hyb_fill_sram;
+
+      // mark miss complete for MLP
+      const uint64_t now_cyc = (current_time.time_since_epoch()) / clock_period;
+      auto line = module_address(fill_mshr);
+      for (auto it = win_misses.rbegin(); it != win_misses.rend(); ++it) {
+        if (it->complete == 0 && it->line == line) { it->complete = now_cyc; break; }
+      }
     }
   }
 
-  // COLLECT STATS
+  // STATS
   if (fill_mshr.type != access_type::PREFETCH)
     sim_stats.total_miss_latency_cycles += (current_time - (fill_mshr.time_enqueued + clock_period)) / clock_period;
+
   sim_stats.mshr_return.increment(std::pair{fill_mshr.type, fill_mshr.cpu});
 
   response_type response{fill_mshr.address, fill_mshr.v_address, fill_mshr.data_promise->data, metadata_thru, fill_mshr.instr_depend_on_me};
@@ -262,6 +319,7 @@ bool CACHE::handle_fill(const mshr_type& fill_mshr)
 
   return true;
 }
+
 
 bool CACHE::try_hit(const tag_lookup_type& handle_pkt)
 {
@@ -295,9 +353,17 @@ bool CACHE::try_hit(const tag_lookup_type& handle_pkt)
       const bool wr = (handle_pkt.type == access_type::WRITE);
       if (way->is_mram) {
         if (wr) ++hyb_hit_mram_wr; else ++hyb_hit_mram_rd;
+        if (wr) ++win_hit_mram_wr; else ++win_hit_mram_rd;
       } else {
         if (wr) ++hyb_hit_sram_wr; else ++hyb_hit_sram_rd;
+        if (wr) ++win_hit_sram_wr; else ++win_hit_sram_rd;
       }
+
+      // track hit overlap for mlp_hit
+      ++inflight_hits;
+      const uint64_t now_cyc = (current_time.time_since_epoch()) / clock_period;
+      const uint64_t lat_cyc = warmup ? 0 : (HIT_LATENCY / clock_period);
+      inflight_hit_retire_cycles.push_back(now_cyc + lat_cyc);
     }
 
     sim_stats.hits.increment(std::pair{handle_pkt.type, handle_pkt.cpu});
@@ -339,6 +405,7 @@ auto CACHE::mshr_and_forward_packet(const tag_lookup_type& handle_pkt) -> std::p
 
   fwd_pkt.instr_depend_on_me = handle_pkt.instr_depend_on_me;
   fwd_pkt.response_requested = (!handle_pkt.prefetch_from_this || !handle_pkt.skip_fill);
+
 
   return std::pair{std::move(to_allocate), std::move(fwd_pkt)};
 }
@@ -396,6 +463,15 @@ bool CACHE::handle_miss(const tag_lookup_type& handle_pkt)
   if (hybrid_enable && NAME == "LLC") {
     if (handle_pkt.type == access_type::WRITE) ++hyb_miss_wr;
     else                                      ++hyb_miss_rd;
+
+    // per-window
+    if (handle_pkt.type == access_type::WRITE) ++win_miss_wr;
+    else                                       ++win_miss_rd;
+    miss_rec r;
+    r.arrive = (current_time.time_since_epoch()) / clock_period;
+    r.complete = 0;
+    r.line = module_address(handle_pkt);
+    win_misses.push_back(r);
   }
 
   return true;
@@ -550,6 +626,35 @@ long CACHE::operate()
                "bw {}\n",
                NAME, __func__, current_time.time_since_epoch() / clock_period, tag_check_bw.amount_consumed(), std::size(inflight_tag_check),
                stash_bandwidth_consumed, std::size(translation_stash), channels_bandwidth_consumed, pq_bandwidth_consumed, initiate_tag_bw.amount_remaining());
+  }
+
+  // ---------- Hybrid per-cycle bookkeeping (LLC only) ----------
+  if (hybrid_enable && NAME == "LLC") {
+    const uint64_t now_cyc = (current_time.time_since_epoch()) / clock_period;
+
+    // retire scheduled hit completions
+    while (!inflight_hit_retire_cycles.empty() && inflight_hit_retire_cycles.front() <= now_cyc) {
+      if (inflight_hits > 0) --inflight_hits;
+      inflight_hit_retire_cycles.pop_front();
+    }
+    // accumulate hit overlap
+    sum_inflight_hits += inflight_hits;
+    if (inflight_hits > 0) ++hit_cover_cycles;
+
+    // start first window lazily
+    if (!win_active) {
+      win_active = true;
+      win_start_cycle = now_cyc;
+      win_end_cycle = now_cyc;
+      next_win_end_cycle = now_cyc + win_cycle_len;
+      // open CSV lazily
+      hybrid_begin_window(now_cyc, 0);
+    }
+    // roll window
+    if (now_cyc >= next_win_end_cycle) {
+      hybrid_end_window(now_cyc, 0);
+      next_win_end_cycle += win_cycle_len;
+    }
   }
 
   return progress + fill_bw.amount_consumed() + initiate_tag_bw.amount_consumed() + tag_check_bw.amount_consumed();
@@ -871,7 +976,30 @@ void CACHE::initialize()
 {
   impl_prefetcher_initialize();
   impl_initialize_replacement();
+
+  // Build per-set way pools if hybrid LLC is enabled
+  if (hybrid_enable && NAME == "LLC") {
+    int total_ways = static_cast<int>(NUM_WAY);
+    // clamp pi_way into [0,1]
+    double p = std::min(1.0, std::max(0.0, pi_way));
+    int mram_ways = static_cast<int>(std::round(p * total_ways));
+    mram_ways = std::min(std::max(mram_ways, 0), total_ways);
+    int sram_ways = total_ways - mram_ways;
+
+    mram_way_ids.assign(NUM_SET, {});
+    sram_way_ids.assign(NUM_SET, {});
+
+    for (uint32_t s = 0; s < NUM_SET; ++s) {
+      mram_way_ids[s].reserve(mram_ways);
+      sram_way_ids[s].reserve(sram_ways);
+      for (int w = 0; w < total_ways; ++w) {
+        if (w < mram_ways) mram_way_ids[s].push_back(w);
+        else                sram_way_ids[s].push_back(w);
+      }
+    }
+  }
 }
+
 
 void CACHE::begin_phase()
 {
@@ -932,7 +1060,10 @@ void CACHE::end_phase(unsigned finished_cpu)
     ul->roi_stats.WQ_TO_CACHE = ul->sim_stats.WQ_TO_CACHE;
     ul->roi_stats.WQ_FORWARD = ul->sim_stats.WQ_FORWARD;
   }
-
+  if (hybrid_enable && NAME=="LLC" && win_active) {
+    uint64_t now_cyc = (current_time.time_since_epoch()) / clock_period;
+    hybrid_end_window(now_cyc, 0);  // flush the last partial window
+  }
   // Print our hybrid counters for this cache
   print_hybrid_stats();
 }
@@ -941,6 +1072,81 @@ template <typename T>
 bool CACHE::should_activate_prefetcher(const T& pkt) const
 {
   return !pkt.prefetch_from_this && std::count(std::begin(pref_activate_mask), std::end(pref_activate_mask), pkt.type) > 0;
+}
+
+// --- helper: compute union cover of miss intervals & sum of latencies
+static uint64_t union_cover(std::vector<CACHE::miss_rec>& recs, uint64_t& sum_lat) {
+  sum_lat = 0;
+  std::vector<std::pair<uint64_t,uint64_t>> iv;
+  iv.reserve(recs.size());
+  for (auto& r : recs) if (r.complete > r.arrive) { iv.push_back({r.arrive, r.complete}); sum_lat += (r.complete - r.arrive); }
+  if (iv.empty()) return 0;
+  std::sort(iv.begin(), iv.end());
+  uint64_t cover=0, L=iv[0].first, R=iv[0].second;
+  for (size_t i=1;i<iv.size();++i) {
+    if (iv[i].first > R) { cover += (R-L); L = iv[i].first; R = iv[i].second; }
+    else R = std::max(R, iv[i].second);
+  }
+  cover += (R-L);
+  return cover;
+}
+
+void CACHE::hybrid_begin_window(uint64_t sc, uint64_t si) {
+  win_start_cycle = sc; win_start_inst = si;
+  if (!win_csv) {
+    std::filesystem::create_directories("results");
+    std::string fname = "results/" + std::string(NAME) + ".llc.win.csv";
+    win_csv = std::fopen(fname.c_str(), "w");
+    if (win_csv) {
+      std::fprintf(win_csv,
+        "window_id,start_cycle,end_cycle,start_inst,end_inst,"
+        "hit_sram_rd,hit_sram_wr,hit_mram_rd,hit_mram_wr,miss_rd,miss_wr,"
+        "sum_lat_miss,cover_time_miss,mlp_miss,sum_inflight_hits,hit_cover_cycles,mlp_hit\n");
+      std::fflush(win_csv);
+    }
+  }
+}
+
+void CACHE::hybrid_end_window(uint64_t ec, uint64_t ei) {
+  win_end_cycle = ec; win_end_inst = ei;
+
+  uint64_t sum_lat=0, cover=union_cover(win_misses, sum_lat);
+  double mlp_miss = cover ? double(sum_lat)/double(cover) : 1.0;
+  double mlp_hit  = hit_cover_cycles ? double(sum_inflight_hits)/double(hit_cover_cycles) : 1.0;
+
+  if (win_csv) {
+    std::fprintf(win_csv,
+      "%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%.6f,%llu,%llu,%.6f\n",
+      (unsigned long long)win_id,
+      (unsigned long long)win_start_cycle,
+      (unsigned long long)win_end_cycle,
+      (unsigned long long)win_start_inst,
+      (unsigned long long)win_end_inst,
+      (unsigned long long)win_hit_sram_rd,
+      (unsigned long long)win_hit_sram_wr,
+      (unsigned long long)win_hit_mram_rd,
+      (unsigned long long)win_hit_mram_wr,
+      (unsigned long long)win_miss_rd,
+      (unsigned long long)win_miss_wr,
+      (unsigned long long)sum_lat,
+      (unsigned long long)cover,
+      mlp_miss,
+      (unsigned long long)sum_inflight_hits,
+      (unsigned long long)hit_cover_cycles,
+      mlp_hit
+    );
+    std::fflush(win_csv);
+  }
+
+  // reset per-window state
+  win_hit_sram_rd=win_hit_sram_wr=win_hit_mram_rd=win_hit_mram_wr=0;
+  win_miss_rd=win_miss_wr=0;
+  win_misses.clear();
+  sum_inflight_hits=hit_cover_cycles=0;
+  inflight_hit_retire_cycles.clear();
+
+  ++win_id;
+  win_start_cycle = ec; win_start_inst = ei;
 }
 
 // LCOV_EXCL_START Exclude the following function from LCOV
