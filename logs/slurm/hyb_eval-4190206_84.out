@@ -1,3 +1,0 @@
-TASK 84: 621.wrf_s-6673B pw=0.25 pm=0.75 tag=pw0.25_pm0.75
-[eval_design] wrote results/eval/621.wrf_s-6673B/pw0.25_pm0.75/metrics.json
-  stall%=24.40  E_total=2.063e-05 J  (rep_rows=3)

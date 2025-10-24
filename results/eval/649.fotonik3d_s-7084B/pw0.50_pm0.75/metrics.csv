@@ -1,2 +1,0 @@
-stall_cycles,window_cycles_sum,stall_pct,E_dynamic_J,E_leakage_J,E_total_J,bench,tag,pi_way,pi_miss,t_sram_hit,t_mram_rd,t_mram_wr,t_dram,l3_mb,roi_cycles,rep_windows_char,rep_windows_mapped,rep_rows
-356347.3408245708,588672.0,0.605341074188293,1.4785000000000002e-05,1.2950784000000001e-05,2.7735784000000003e-05,649.fotonik3d_s-7084B,pw0.50_pm0.75,0.5,0.75,16.0,28.0,60.0,184.7,8.0,9931470,"[12, 35, 52]","[13, 36, 53]",3

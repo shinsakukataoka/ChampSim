@@ -1,3 +1,0 @@
-TASK 40: 623.xalancbmk_s-700B pw=0.5 pm=0.25 tag=pw0.50_pm0.25
-[eval_design] wrote results/eval/623.xalancbmk_s-700B/pw0.50_pm0.25/metrics.json
-  stall%=12.73  E_total=1.785e-05 J  (rep_rows=3)

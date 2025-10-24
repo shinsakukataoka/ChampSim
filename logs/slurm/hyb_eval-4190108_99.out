@@ -1,3 +1,0 @@
-TASK 99: 648.exchange2_s-1247B pw=0.75 pm=0.75 tag=pw0.75_pm0.75
-[eval_design] wrote results/eval/648.exchange2_s-1247B/pw0.75_pm0.75/metrics.json
-  stall%=17.37  E_total=4.926e-06 J  (rep_rows=2)

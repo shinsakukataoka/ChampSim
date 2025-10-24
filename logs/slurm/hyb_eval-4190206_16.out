@@ -1,3 +1,0 @@
-TASK 16: 602.gcc_s-1850B pw=0.75 pm=0.25 tag=pw0.75_pm0.25
-[eval_design] wrote results/eval/602.gcc_s-1850B/pw0.75_pm0.25/metrics.json
-  stall%=55.88  E_total=1.622e-05 J  (rep_rows=3)

@@ -1,3 +1,0 @@
-TASK 24: 620.omnetpp_s-874B pw=0.5 pm=0.75 tag=pw0.50_pm0.75
-[eval_design] wrote results/eval/620.omnetpp_s-874B/pw0.50_pm0.75/metrics.json
-  stall%=152.13  E_total=3.712e-05 J  (rep_rows=3)

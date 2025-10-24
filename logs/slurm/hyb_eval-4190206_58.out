@@ -1,3 +1,0 @@
-TASK 58: 641.leela_s-1083B pw=0.5 pm=0.25 tag=pw0.50_pm0.25
-[eval_design] wrote results/eval/641.leela_s-1083B/pw0.50_pm0.25/metrics.json
-  stall%=53.85  E_total=1.988e-05 J  (rep_rows=3)

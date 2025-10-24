@@ -1,3 +1,0 @@
-TASK 32: 605.mcf_s-994B pw=0.5 pm=0.5 tag=pw0.50_pm0.50
-[eval_design] wrote results/eval/605.mcf_s-994B/pw0.50_pm0.50/metrics.json
-  stall%=70.38  E_total=2.825e-05 J  (rep_rows=3)

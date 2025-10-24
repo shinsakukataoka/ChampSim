@@ -1,3 +1,0 @@
-TASK 104: 649.fotonik3d_s-7084B pw=0.5 pm=0.5 tag=pw0.50_pm0.50
-[eval_design] wrote results/eval/649.fotonik3d_s-7084B/pw0.50_pm0.50/metrics.json
-  stall%=68.53  E_total=2.895e-05 J  (rep_rows=3)

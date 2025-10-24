@@ -1,2 +1,0 @@
-stall_cycles,window_cycles_sum,stall_pct,E_dynamic_J,E_leakage_J,E_total_J,bench,tag,pi_way,pi_miss,t_sram_hit,t_mram_rd,t_mram_wr,t_dram,l3_mb,roi_cycles,rep_windows_char,rep_windows_mapped,rep_rows
-299305.68913152337,555846.0,0.5384687289852286,7.65e-06,7.225998000000001e-06,1.4875998e-05,641.leela_s-1083B,pw0.75_pm0.75,0.75,0.75,16.0,28.0,60.0,155.0,8.0,3748976,"[2, 0, 4]","[2, 0, 5]",3

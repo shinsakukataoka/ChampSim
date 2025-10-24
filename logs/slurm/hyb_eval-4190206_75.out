@@ -1,3 +1,0 @@
-TASK 75: 619.lbm_s-2677B pw=0.25 pm=0.75 tag=pw0.25_pm0.75
-[eval_design] wrote results/eval/619.lbm_s-2677B/pw0.25_pm0.75/metrics.json
-  stall%=59.22  E_total=5.800e-05 J  (rep_rows=3)

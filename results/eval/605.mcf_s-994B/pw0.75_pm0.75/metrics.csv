@@ -1,2 +1,0 @@
-stall_cycles,window_cycles_sum,stall_pct,E_dynamic_J,E_leakage_J,E_total_J,bench,tag,pi_way,pi_miss,t_sram_hit,t_mram_rd,t_mram_wr,t_dram,l3_mb,roi_cycles,rep_windows_char,rep_windows_mapped,rep_rows
-426243.03147792106,600000.0,0.7104050524632017,1.5172999999999999e-05,7.8e-06,2.2973e-05,605.mcf_s-994B,pw0.75_pm0.75,0.75,0.75,16.0,28.0,60.0,193.3,8.0,13262810,"[14, 20, 41]","[15, 21, 43]",3
