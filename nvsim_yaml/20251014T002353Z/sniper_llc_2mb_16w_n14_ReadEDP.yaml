@@ -1,0 +1,33 @@
+# Auto-generated from NVSim summary 20251014T002353Z for 2MB, 16-way, node 14nm, opt ReadEDP
+script: scripts/run_all.sbatch
+sbatch_args:
+  - --job-name=sniper-llc-2mb-16w-n14-ReadEDP
+  - --output=logs/%x-%A_%a.out
+  - --error=logs/%x-%A_%a.err
+
+env:
+  SKIP_TRACE: 1
+  SPEC_SIZE: ref
+  SIM_N: 4
+  ROI_M: 1000
+  WARMUP_M: 100
+  OUT_ROOT: "${PWD}/results/sniper_llc_2mb_16w_n14_ReadEDP_{timestamp}"
+
+llc:
+  sram:
+    size_bytes: 2097152
+    assoc_ways: 16
+    line_bytes: 64
+    bus_width_bits: 512
+    temp_k: 300.0
+    tech_node_nm: 14
+    read_hit_cycles: 4
+    write_hit_cycles: 3
+    timing:
+      miss_latency_ns: 0.671
+    energy:
+      enabled: true
+      e_read_hit_pJ: 171
+      e_write_hit_pJ: 157
+      e_miss_pJ: 171
+      p_leak_mW: 44.747

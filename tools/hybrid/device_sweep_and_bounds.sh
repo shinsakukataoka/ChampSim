@@ -1,7 +1,10 @@
-# DROP-IN replacement for tools/hybrid/device_sweep_and_bounds.sh
 #!/usr/bin/env bash
+# DROP-IN replacement for tools/hybrid/device_sweep_and_bounds.sh
 set -euo pipefail
-ROOT="/home/skataoka26/ChampSim"; cd "$ROOT"
+
+# Repo root (relative to this script)
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+cd "$ROOT"
 
 DEVICE_ROOT="devices"
 LATENCY_MODE="device"          # default: use device latencies
@@ -16,7 +19,9 @@ while [[ $# -gt 0 ]]; do
     --latency-mode) LATENCY_MODE="$2"; shift 2;;
     --caps) CAPS="$2"; shift 2;;
     --no-bounds) WITH_BOUNDS=0; shift;;
-    -h|--help) echo "usage: $0 [--device-root DIR] [--latency-mode dataset|device] [--caps 32|2,128] [--no-bounds] <profile1> [profile2 ...]"; exit 0;;
+    -h|--help)
+      echo "usage: $0 [--device-root DIR] [--latency-mode dataset|device] [--caps 32|2,128] [--no-bounds] <profile1> [profile2 ...]"
+      exit 0;;
     *) PROFILES+=("$1"); shift;;
   esac
 done
@@ -34,11 +39,13 @@ for P in "${PROFILES[@]}"; do
        --latency-mode "$LATENCY_MODE" \
        "${CAP_FLAG[@]}"
 
-  [[ $WITH_BOUNDS -eq 1 ]] && python3 tools/hybrid/policy_bounds.py \
-  --device-root "$DEVICE_ROOT" \
-  --device-profile "$P" \
-  --latency-mode "$LATENCY_MODE" \
-  "${CAP_FLAG[@]}"
+  if [[ $WITH_BOUNDS -eq 1 ]]; then
+    python3 tools/hybrid/policy_bounds.py \
+      --device-root "$DEVICE_ROOT" \
+      --device-profile "$P" \
+      --latency-mode "$LATENCY_MODE" \
+      "${CAP_FLAG[@]}"
+  fi
 
   # archive outputs per profile/cap
   for f in results/eval/dataset_L3_*MB.csv; do

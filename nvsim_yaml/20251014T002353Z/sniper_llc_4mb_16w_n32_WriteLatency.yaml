@@ -1,0 +1,51 @@
+# Auto-generated from NVSim summary 20251014T002353Z for 4MB, 16-way, node 32nm, opt WriteLatency
+script: scripts/run_all.sbatch
+sbatch_args:
+  - --job-name=sniper-llc-4mb-16w-n32-WriteLatency
+  - --output=logs/%x-%A_%a.out
+  - --error=logs/%x-%A_%a.err
+
+env:
+  SKIP_TRACE: 1
+  SPEC_SIZE: ref
+  SIM_N: 4
+  ROI_M: 1000
+  WARMUP_M: 100
+  OUT_ROOT: "${PWD}/results/sniper_llc_4mb_16w_n32_WriteLatency_{timestamp}"
+
+llc:
+  sram:
+    size_bytes: 4194304
+    assoc_ways: 16
+    line_bytes: 64
+    bus_width_bits: 512
+    temp_k: 300.0
+    tech_node_nm: 32
+    read_hit_cycles: 6
+    write_hit_cycles: 4
+    timing:
+      miss_latency_ns: 0.528
+    energy:
+      enabled: true
+      e_read_hit_pJ: 708
+      e_write_hit_pJ: 674
+      e_miss_pJ: 708
+      p_leak_mW: 51.771
+
+  jans:
+    size_bytes: 4194304
+    assoc_ways: 16
+    line_bytes: 64
+    bus_width_bits: 512
+    temp_k: 300.0
+    tech_node_nm: 32
+    read_hit_cycles: 8
+    write_hit_cycles: 30
+    timing:
+      miss_latency_ns: 1.734
+    energy:
+      enabled: true
+      e_read_hit_pJ: 1067
+      e_write_hit_pJ: 715
+      e_miss_pJ: 1067
+      p_leak_mW: 17.036

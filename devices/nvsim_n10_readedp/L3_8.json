@@ -1,0 +1,23 @@
+{
+  "f_clk_ghz": 1.0,
+  "latency": {
+    "t_sram_hit": 5,
+    "t_mram_rd": 9,
+    "t_mram_wr": 31,
+    "t_miss_cycles": 200
+  },
+  "sram": {
+    "e_rd_pj": 240.0,
+    "e_wr_pj": 227.0,
+    "leak_mw_per_mb": 12.418625
+  },
+  "mram": {
+    "e_rd_pj": 836.0,
+    "e_wr_pj": 500.0,
+    "leak_mw_per_mb": 3.16475
+  },
+  "dram": {
+    "e_miss_pj": 3000.0,
+    "e_miss_per_ns_pj": 0.0
+  }
+}

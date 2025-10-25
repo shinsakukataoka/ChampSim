@@ -1,0 +1,51 @@
+# Auto-generated from NVSim summary 20251014T002353Z for 32MB, 16-way, node 32nm, opt Area
+script: scripts/run_all.sbatch
+sbatch_args:
+  - --job-name=sniper-llc-32mb-16w-n32-Area
+  - --output=logs/%x-%A_%a.out
+  - --error=logs/%x-%A_%a.err
+
+env:
+  SKIP_TRACE: 1
+  SPEC_SIZE: ref
+  SIM_N: 4
+  ROI_M: 1000
+  WARMUP_M: 100
+  OUT_ROOT: "${PWD}/results/sniper_llc_32mb_16w_n32_Area_{timestamp}"
+
+llc:
+  sram:
+    size_bytes: 33554432
+    assoc_ways: 16
+    line_bytes: 64
+    bus_width_bits: 512
+    temp_k: 300.0
+    tech_node_nm: 32
+    read_hit_cycles: 5263
+    write_hit_cycles: 3138
+    timing:
+      miss_latency_ns: 43.354
+    energy:
+      enabled: true
+      e_read_hit_pJ: 8854
+      e_write_hit_pJ: 64
+      e_miss_pJ: 8854
+      p_leak_mW: 6.669
+
+  jans:
+    size_bytes: 33554432
+    assoc_ways: 16
+    line_bytes: 64
+    bus_width_bits: 512
+    temp_k: 300.0
+    tech_node_nm: 32
+    read_hit_cycles: 3136
+    write_hit_cycles: 1986
+    timing:
+      miss_latency_ns: 39.28
+    energy:
+      enabled: true
+      e_read_hit_pJ: 889
+      e_write_hit_pJ: 189
+      e_miss_pJ: 889
+      p_leak_mW: 1.513

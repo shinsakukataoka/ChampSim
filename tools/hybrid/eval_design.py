@@ -8,7 +8,7 @@ THIS = os.path.abspath(os.path.dirname(__file__))                # .../ChampSim/
 ROOT = os.path.abspath(os.path.join(THIS, "..", ".."))           # .../ChampSim
 BIN  = os.path.join(ROOT, "bin", "champsim")
 
-TRACES_ROOT = "/home/skataoka26/traces/speccpu"
+TRACES_ROOT = os.environ.get("TRACES_ROOT", os.path.expanduser("~/traces/speccpu"))
 WARM = 2_000_000
 SIM  = 5_000_000
 

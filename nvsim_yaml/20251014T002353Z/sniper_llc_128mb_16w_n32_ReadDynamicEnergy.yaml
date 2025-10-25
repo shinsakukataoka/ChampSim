@@ -1,0 +1,51 @@
+# Auto-generated from NVSim summary 20251014T002353Z for 128MB, 16-way, node 32nm, opt ReadDynamicEnergy
+script: scripts/run_all.sbatch
+sbatch_args:
+  - --job-name=sniper-llc-128mb-16w-n32-ReadDynamicEnergy
+  - --output=logs/%x-%A_%a.out
+  - --error=logs/%x-%A_%a.err
+
+env:
+  SKIP_TRACE: 1
+  SPEC_SIZE: ref
+  SIM_N: 4
+  ROI_M: 1000
+  WARMUP_M: 100
+  OUT_ROOT: "${PWD}/results/sniper_llc_128mb_16w_n32_ReadDynamicEnergy_{timestamp}"
+
+llc:
+  sram:
+    size_bytes: 134217728
+    assoc_ways: 16
+    line_bytes: 64
+    bus_width_bits: 512
+    temp_k: 300.0
+    tech_node_nm: 32
+    read_hit_cycles: 5238
+    write_hit_cycles: 3110
+    timing:
+      miss_latency_ns: 157.218
+    energy:
+      enabled: true
+      e_read_hit_pJ: 784
+      e_write_hit_pJ: 646
+      e_miss_pJ: 784
+      p_leak_mW: 1222.061
+
+  jans:
+    size_bytes: 134217728
+    assoc_ways: 16
+    line_bytes: 64
+    bus_width_bits: 512
+    temp_k: 300.0
+    tech_node_nm: 32
+    read_hit_cycles: 3090
+    write_hit_cycles: 1989
+    timing:
+      miss_latency_ns: 40.478
+    energy:
+      enabled: true
+      e_read_hit_pJ: 799
+      e_write_hit_pJ: 442
+      e_miss_pJ: 799
+      p_leak_mW: 21.852

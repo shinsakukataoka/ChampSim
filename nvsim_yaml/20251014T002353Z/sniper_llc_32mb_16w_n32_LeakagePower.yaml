@@ -1,0 +1,51 @@
+# Auto-generated from NVSim summary 20251014T002353Z for 32MB, 16-way, node 32nm, opt LeakagePower
+script: scripts/run_all.sbatch
+sbatch_args:
+  - --job-name=sniper-llc-32mb-16w-n32-LeakagePower
+  - --output=logs/%x-%A_%a.out
+  - --error=logs/%x-%A_%a.err
+
+env:
+  SKIP_TRACE: 1
+  SPEC_SIZE: ref
+  SIM_N: 4
+  ROI_M: 1000
+  WARMUP_M: 100
+  OUT_ROOT: "${PWD}/results/sniper_llc_32mb_16w_n32_LeakagePower_{timestamp}"
+
+llc:
+  sram:
+    size_bytes: 33554432
+    assoc_ways: 16
+    line_bytes: 64
+    bus_width_bits: 512
+    temp_k: 300.0
+    tech_node_nm: 32
+    read_hit_cycles: 1412
+    write_hit_cycles: 877
+    timing:
+      miss_latency_ns: 113.491
+    energy:
+      enabled: true
+      e_read_hit_pJ: 9055
+      e_write_hit_pJ: 72
+      e_miss_pJ: 9055
+      p_leak_mW: 5.583
+
+  jans:
+    size_bytes: 33554432
+    assoc_ways: 16
+    line_bytes: 64
+    bus_width_bits: 512
+    temp_k: 300.0
+    tech_node_nm: 32
+    read_hit_cycles: 981
+    write_hit_cycles: 822
+    timing:
+      miss_latency_ns: 91.983
+    energy:
+      enabled: true
+      e_read_hit_pJ: 940
+      e_write_hit_pJ: 255
+      e_miss_pJ: 940
+      p_leak_mW: 0.909

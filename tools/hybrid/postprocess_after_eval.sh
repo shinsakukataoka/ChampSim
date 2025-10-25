@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
-
-ROOT="/home/skataoka26/ChampSim"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT"
+
 
 # ---- device/latency CLI flags (no touching results/) ----
 DEVICE_ROOT="devices"

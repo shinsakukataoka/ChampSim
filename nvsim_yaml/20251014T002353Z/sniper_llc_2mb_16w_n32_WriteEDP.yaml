@@ -1,0 +1,51 @@
+# Auto-generated from NVSim summary 20251014T002353Z for 2MB, 16-way, node 32nm, opt WriteEDP
+script: scripts/run_all.sbatch
+sbatch_args:
+  - --job-name=sniper-llc-2mb-16w-n32-WriteEDP
+  - --output=logs/%x-%A_%a.out
+  - --error=logs/%x-%A_%a.err
+
+env:
+  SKIP_TRACE: 1
+  SPEC_SIZE: ref
+  SIM_N: 4
+  ROI_M: 1000
+  WARMUP_M: 100
+  OUT_ROOT: "${PWD}/results/sniper_llc_2mb_16w_n32_WriteEDP_{timestamp}"
+
+llc:
+  sram:
+    size_bytes: 2097152
+    assoc_ways: 16
+    line_bytes: 64
+    bus_width_bits: 512
+    temp_k: 300.0
+    tech_node_nm: 32
+    read_hit_cycles: 33
+    write_hit_cycles: 23
+    timing:
+      miss_latency_ns: 1.922
+    energy:
+      enabled: true
+      e_read_hit_pJ: 569
+      e_write_hit_pJ: 15
+      e_miss_pJ: 569
+      p_leak_mW: 0.958
+
+  jans:
+    size_bytes: 2097152
+    assoc_ways: 16
+    line_bytes: 64
+    bus_width_bits: 512
+    temp_k: 300.0
+    tech_node_nm: 32
+    read_hit_cycles: 60
+    write_hit_cycles: 62
+    timing:
+      miss_latency_ns: 2.969
+    energy:
+      enabled: true
+      e_read_hit_pJ: 436
+      e_write_hit_pJ: 96
+      e_miss_pJ: 436
+      p_leak_mW: 1.601
