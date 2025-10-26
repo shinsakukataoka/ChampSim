@@ -6,7 +6,7 @@ import pandas as pd
 # ---------- paths / defaults ----------
 THIS = os.path.abspath(os.path.dirname(__file__))                # .../ChampSim/tools/hybrid
 ROOT = os.path.abspath(os.path.join(THIS, "..", ".."))           # .../ChampSim
-BIN  = os.path.join(ROOT, "bin", "champsim")
+BIN  = os.environ.get("CHAMPSIM_BIN", os.path.join(ROOT, "bin", "champsim"))
 
 TRACES_ROOT = os.environ.get("TRACES_ROOT", os.path.expanduser("~/traces/speccpu"))
 WARM = 2_000_000
@@ -134,12 +134,10 @@ def compute_metrics(df_reps, t_s, t_mr, t_mw, t_dr, l3_mb, pi_way, stall_base_ts
 def stage_llc_config(root, run_cwd, size_mb):
     src = os.path.join(root, "champsim_config.json")
     cfg = json.load(open(src))
-    for c in cfg.get("caches", []):
-        if c.get("name","").upper()=="LLC":
-            bl   = int(c.get("block_size", 64))
-            ways = int(c.get("ways", 16))
-            sets = int((size_mb*1024*1024)//(bl*ways))
-            c["sets"] = sets
+    bl   = int(cfg.get("block_size", 64))
+    ways = int(cfg.get("LLC", {}).get("ways", 16))
+    sets = int((size_mb*1024*1024)//(bl*ways))
+    cfg.setdefault("LLC", {})["sets"] = sets
     dst = os.path.join(run_cwd, "champsim_config.json")
     with open(dst, "w") as f:
         json.dump(cfg, f, indent=2)

@@ -16,7 +16,9 @@ cd "$ROOT"
 PARAMS_FILE="${1:-tools/hybrid/params_eval.tsv}"
 L3MB="${2:-}"                  # << optional capacity (MB)
 TAG_SUFFIX="${3:-}"            # << optional tag suffix (e.g., L3_32MB)
-
+if [[ -n "$L3MB" ]]; then
+  export CHAMPSIM_BIN="$ROOT/bin/champsim_L3_${L3MB}MB"
+fi
 # pick the Nth line (no header expected)
 line=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$PARAMS_FILE")
 IFS=$'\t' read -r bench pi_way pi_miss tS tMr tMw tag <<< "$line"

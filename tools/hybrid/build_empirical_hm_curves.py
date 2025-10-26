@@ -37,8 +37,23 @@ def select_by_fraction(new_win_csv, rep_fracs):
     if df.empty or not rep_fracs:
         return df.iloc[0:0].copy()
     fracs = compute_mid_fractions(df)
-    idx = [int(np.argmin(np.abs(fracs - f))) for f in rep_fracs]
-    return df.iloc[idx].copy()
+    used=set(); chosen_idx=[]
+    for f in rep_fracs:
+        order = np.argsort(np.abs(fracs - f))
+        pick = None
+        for j in order:
+            j = int(j)
+            if j in used: 
+                continue
+            hits = (df.loc[j,"hit_sram_rd"]+df.loc[j,"hit_sram_wr"]+
+                    df.loc[j,"hit_mram_rd"]+df.loc[j,"hit_mram_wr"])
+            if hits > 0:    # prefer a window that actually has hits
+                pick = j; break
+        if pick is None:
+            pick = int(order[0])   # as absolute fallback
+        if pick is not None:
+            used.add(pick); chosen_idx.append(pick)
+    return df.iloc[chosen_idx].copy()
 
 
 def collect_points_for_bench(bench):
@@ -79,7 +94,9 @@ def fit_isotonic(xs, ys):
     if len(np.unique(xs)) < 2:
         return {"x": xs.tolist(), "y": [float(np.clip(np.mean(ys), 0, 1))]*len(xs)}
     iso = IsotonicRegression(y_min=0.0, y_max=1.0, increasing=True, out_of_bounds="clip")
-    yfit = iso.fit_transform(xs, ys)
+    weights = np.ones_like(xs)
+    # if you have 'rep_rows' per tag, use it; else leave ones
+    yfit = iso.fit_transform(xs, ys, sample_weight=weights)
     return {"x": xs.tolist(), "y": yfit.tolist()}
 
 def main():
@@ -112,4 +129,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

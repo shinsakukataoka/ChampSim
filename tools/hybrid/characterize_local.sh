@@ -2,8 +2,6 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT"
-
-: "${TRACES_ROOT:?Set TRACES_ROOT to the directory with *.champsimtrace.xz}"
 command -v jq >/dev/null || { echo "need 'jq' (sudo apt install -y jq)"; exit 1; }
 command -v parallel >/dev/null || { echo "need 'parallel' (sudo apt install -y parallel)"; exit 1; }
 export ROOT TRACES_ROOT K STDN_THR MPKC_MIN
@@ -41,10 +39,9 @@ run_one() {  # MB BENCH
 import sys, json, os
 root, mb, cwd = sys.argv[1], float(sys.argv[2]), sys.argv[3]
 cfg = json.load(open(os.path.join(root,"champsim_config.json")))
-for c in cfg.get("caches",[]):
-    if c.get("name","").upper()=="LLC":
-        bl=int(c.get("block_size",64)); ways=int(c.get("ways",16))
-        c["sets"]=int((mb*1024*1024)//(bl*ways))
+bl   = int(cfg.get("block_size",64))
+ways = int(cfg.get("LLC",{}).get("ways",16))
+cfg.setdefault("LLC",{})["sets"] = int((mb*1024*1024)//(bl*ways))
 json.dump(cfg, open(os.path.join(cwd,"champsim_config.json"),"w"), indent=2)
 PY
 
@@ -67,7 +64,7 @@ export -f run_one
 # Note: Other variables are exported at the top
 
 for MB in "${CAPS[@]}"; do
-  parallel --env ROOT,TRACES_ROOT,K,STDN_THR,MPKC_MIN \
-           -j "$JOBS" --halt now,fail=1 \
-           tools/hybrid/char_one.sh "$MB" ::: "${BENCHES[@]}"
+	parallel --env ROOT,TRACES_ROOT,K,STDN_THR,MPKC_MIN,CHAMPSIM_BIN \
+         -j "$JOBS" --halt now,fail=1 \
+         tools/hybrid/char_one.sh "$MB" ::: "${BENCHES[@]}"
 done

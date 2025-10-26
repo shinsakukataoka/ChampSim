@@ -7,7 +7,7 @@ cd "$ROOT"
 # ---- device/latency CLI flags (no touching results/) ----
 DEVICE_ROOT="devices"
 DEVICE_PROFILE=""
-LATENCY_MODE="dataset"   # dataset | device
+LATENCY_MODE="dataset"    # dataset | device
 LEAK_SCALE=0
 
 # --- put this near the other flag vars ---
@@ -82,10 +82,10 @@ for CAP in "${CAPS[@]}"; do
   # Stash builder outputs per capacity
   mkdir -p "results/surrogate/L3_${CAP}"
   mv -f results/surrogate/benchmark_fingerprints.csv "results/surrogate/L3_${CAP}/"
-  mv -f results/surrogate/hm_curves.joblib            "results/surrogate/L3_${CAP}/"
+  mv -f results/surrogate/hm_curves.joblib          "results/surrogate/L3_${CAP}/"
 
   # Use per-cap dataset+fingerprints -> training table -> train models
-  \cp -f "results/eval/dataset_L3_${CAP}MB.csv"              results/eval/dataset.csv
+  \cp -f "results/eval/dataset_L3_${CAP}MB.csv"            results/eval/dataset.csv
   \cp -f "results/surrogate/L3_${CAP}/benchmark_fingerprints.csv"  results/surrogate/benchmark_fingerprints.csv
   python3 tools/hybrid/build_training_table.py
   python3 tools/hybrid/train_surrogate_perbench.py
@@ -117,8 +117,9 @@ import os, json, numpy as np, pandas as pd, joblib, sys
 # where to look for device configs
 DEV_ROOT = os.environ.get("DEVICE_ROOT","devices")
 DEV_PROF = os.environ.get("DEVICE_PROFILE","")
-LATENCY_MODE = os.environ.get("LATENCY_MODE","dataset")   # dataset | device
+LATENCY_MODE = os.environ.get("LATENCY_MODE","dataset")    # dataset | device
 LEAK_SCALE = os.environ.get("LEAK_SCALE","0") == "1"
+STALL_BASE_TS = float(os.environ.get("STALL_BASE_TS", "16.0"))
 
 def load_device_json(profile:str, cap:int):
     """Load devices/<profile>/base.json then overlay devices/<profile>/L3_<cap>.json if present."""
@@ -214,15 +215,6 @@ for _,r in D.iterrows():
     if key is None: continue
     frac_mram = iso_eval(tb[key], pw)
 
-    # fingerprint counts (per 1k cycles)
-    f  = FP.loc[b]
-    A1k=float(f["char_acc_per_1kcyc"]); mr=float(f["char_miss_rate"]); rf=float(f["char_read_frac"])
-    M1k=mr*A1k; H1k=A1k-M1k
-    HM  = frac_mram*H1k; HS = H1k-HM
-    HM_rd=rf*HM; HM_wr=(1-rf)*HM
-    HS_rd=rf*HS; HS_wr=(1-rf)*HS
-    mlp_hit=max(1.0,float(f["char_mlp_hit"])); mlp_miss=max(1.0,float(f["char_mlp_miss"]))
-
     # rep-window time scaling from the actual run
     L3=float(r.get("l3_mb", cap))
     char_dir=f"results/characterization_L3_{int(L3)}/{b}"
@@ -232,8 +224,43 @@ for _,r in D.iterrows():
     reps = pick_unique(run_csv, rep_fr)
     Tk = float(((reps['end_cycle'] - reps['start_cycle']).sum())/1000.0)  # kcycles
 
+    # Need fingerprint 'f' for fallbacks
+    f  = FP.loc[b]
+
+    # (Fix 2) Use run-measured MLP (from mapped reps)
+    mlp_hit  = max(1.0, float(reps["mlp_hit"].mean()))   if not reps.empty else max(1.0, float(f["char_mlp_hit"]))
+    mlp_miss = max(1.0, float(reps["mlp_miss"].mean()))  if not reps.empty else max(1.0, float(f["char_mlp_miss"]))
+
+    # ---- (NEW PATCH) use run-measured counts from mapped reps (per tag) ----
+    USE_RUN_COUNTS = os.environ.get("USE_RUN_COUNTS","1") == "1"
+    if USE_RUN_COUNTS and not reps.empty and Tk > 0:
+        Hs_rd = float(reps["hit_sram_rd"].sum())
+        Hs_wr = float(reps["hit_sram_wr"].sum())
+        Hm_rd_sum = float(reps["hit_mram_rd"].sum())
+        Hm_wr_sum = float(reps["hit_mram_wr"].sum())
+        M_rd = float(reps["miss_rd"].sum())
+        M_wr = float(reps["miss_wr"].sum())
+        A_tot = Hs_rd+Hs_wr+Hm_rd_sum+Hm_wr_sum+M_rd+M_wr
+        H_tot = Hs_rd+Hs_wr+Hm_rd_sum+Hm_wr_sum
+        M_tot = M_rd+M_wr
+        A1k = A_tot / Tk
+        M1k = M_tot / Tk
+        H1k = H_tot / Tk
+        rf  = (Hs_rd + Hm_rd_sum + M_rd) / max(A_tot, 1.0)
+    else:
+        A1k=float(f["char_acc_per_1kcyc"]); mr=float(f["char_miss_rate"]); rf=float(f["char_read_frac"])
+        M1k=mr*A1k; H1k=A1k-M1k
+
+    # (These lines use the A1k/M1k/H1k/rf from above)
+    HM  = frac_mram*H1k; HS = H1k-HM
+    HM_rd=rf*HM; HM_wr=(1-rf)*HM
+    HS_rd=rf*HS; HS_wr=(1-rf)*HS
+
     # stall (per 1k → fraction)
-    d_rd=tMr-tS; d_wr=tMw-tS; d_mi=tDR-tS
+    # (Fix 1) Anchor deltas to the same baseline used in eval_design.py
+    d_rd = tMr - STALL_BASE_TS
+    d_wr = tMw - STALL_BASE_TS
+    d_mi = tDR - STALL_BASE_TS
     stall_k=(HM_rd*d_rd + HM_wr*d_wr)/mlp_hit + (M1k*d_mi)/mlp_miss
     stall_frac=stall_k/1000.0
 
@@ -262,4 +289,3 @@ PY
 
 done
 echo "[done] Post-process completed."
-
