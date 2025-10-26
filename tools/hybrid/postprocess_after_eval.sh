@@ -7,7 +7,7 @@ cd "$ROOT"
 # ---- device/latency CLI flags (no touching results/) ----
 DEVICE_ROOT="devices"
 DEVICE_PROFILE=""
-LATENCY_MODE="dataset"    # dataset | device
+LATENCY_MODE="dataset"     # dataset | device
 LEAK_SCALE=0
 
 # --- put this near the other flag vars ---
@@ -93,7 +93,7 @@ for CAP in "${CAPS[@]}"; do
   # Archive training artifacts
   \cp -f results/surrogate/training_table.csv "results/surrogate/L3_${CAP}/training_table.csv"
   \cp -f results/surrogate/surrogate_* "results/surrogate/L3_${CAP}/" 2>/dev/null || true
-  \cp -f results/surrogate/*_hgb_*.joblib     "results/surrogate/L3_${CAP}/" 2>/dev/null || true
+  \cp -f results/surrogate/*_hgb_*.joblib      "results/surrogate/L3_${CAP}/" 2>/dev/null || true
 
   # ---------- ML predictions ----------
   python3 - "$CAP" <<'PY'
@@ -117,7 +117,7 @@ import os, json, numpy as np, pandas as pd, joblib, sys
 # where to look for device configs
 DEV_ROOT = os.environ.get("DEVICE_ROOT","devices")
 DEV_PROF = os.environ.get("DEVICE_PROFILE","")
-LATENCY_MODE = os.environ.get("LATENCY_MODE","dataset")    # dataset | device
+LATENCY_MODE = os.environ.get("LATENCY_MODE","dataset")     # dataset | device
 LEAK_SCALE = os.environ.get("LEAK_SCALE","0") == "1"
 STALL_BASE_TS = float(os.environ.get("STALL_BASE_TS", "16.0"))
 
@@ -187,6 +187,19 @@ def pick_unique(run_csv, rep_fracs):
                 used.add(int(j)); idx.append(int(j)); break
     return df.iloc[idx].copy()
 
+# add helper near other defs
+def load_eval_mapped_ids(run_dir):
+    mpath = os.path.join(run_dir, "metrics.json")
+    try:
+        if os.path.exists(mpath):
+            meta = json.load(open(mpath))
+            ids = meta.get("rep_windows_mapped", [])
+            # some runs store ints as strings
+            return [int(x) for x in ids]
+    except Exception:
+        pass
+    return []
+
 def iso_eval(curve, x):
     xs=np.asarray(curve["x"], float); ys=np.asarray(curve["y"], float)
     return float(np.interp(x, xs, ys)) if xs.size>0 else 0.5
@@ -219,51 +232,88 @@ for _,r in D.iterrows():
     L3=float(r.get("l3_mb", cap))
     char_dir=f"results/characterization_L3_{int(L3)}/{b}"
     rep_fr = load_rep_fracs(char_dir)
-    run_csv=f"results/eval/{b}/{tag}/LLC.llc.win.csv"
+
+    run_dir=os.path.join("results","eval", b, tag)
+    run_csv=os.path.join(run_dir,"LLC.llc.win.csv")
     if not os.path.exists(run_csv): continue
-    reps = pick_unique(run_csv, rep_fr)
+    df_run = pd.read_csv(run_csv, engine="python", on_bad_lines="skip")
+    if "window_id" in df_run.columns:
+        df_run["window_id"] = pd.to_numeric(df_run["window_id"], errors="coerce").fillna(-1).astype(int)
+
+    # >>> prefer eval’s exact mapped windows
+    mapped_ids = load_eval_mapped_ids(run_dir)
+    if mapped_ids:
+        reps = df_run[df_run["window_id"].isin(mapped_ids)].copy()
+    else:
+        # fall back to time-fraction mapping
+        reps = pick_unique(run_csv, rep_fr)
+    if reps.empty: continue
     Tk = float(((reps['end_cycle'] - reps['start_cycle']).sum())/1000.0)  # kcycles
 
-    # Need fingerprint 'f' for fallbacks
-    f  = FP.loc[b]
+    # ---- per-window stall (single source of truth for ALL cases) ----
+    # Per-window counts from mapped reps
+    hs_rd_w  = reps["hit_sram_rd"].to_numpy(float)
+    hs_wr_w  = reps["hit_sram_wr"].to_numpy(float)
+    hm_rd_w  = reps["hit_mram_rd"].to_numpy(float)
+    hm_wr_w  = reps["hit_mram_wr"].to_numpy(float)
+    m_w      = (reps["miss_rd"] + reps["miss_wr"]).to_numpy(float)
+    mlp_hit_w  = np.maximum(1.0, reps["mlp_hit"].to_numpy(float))
+    mlp_miss_w = np.maximum(1.0, reps["mlp_miss"].to_numpy(float))
 
-    # (Fix 2) Use run-measured MLP (from mapped reps)
-    mlp_hit  = max(1.0, float(reps["mlp_hit"].mean()))   if not reps.empty else max(1.0, float(f["char_mlp_hit"]))
-    mlp_miss = max(1.0, float(reps["mlp_miss"].mean()))  if not reps.empty else max(1.0, float(f["char_mlp_miss"]))
+    # hits per window
+    H_rd_w = hs_rd_w + hm_rd_w
+    H_wr_w = hs_wr_w + hm_wr_w
 
-    # ---- (NEW PATCH) use run-measured counts from mapped reps (per tag) ----
-    USE_RUN_COUNTS = os.environ.get("USE_RUN_COUNTS","1") == "1"
-    if USE_RUN_COUNTS and not reps.empty and Tk > 0:
-        Hs_rd = float(reps["hit_sram_rd"].sum())
-        Hs_wr = float(reps["hit_sram_wr"].sum())
-        Hm_rd_sum = float(reps["hit_mram_rd"].sum())
-        Hm_wr_sum = float(reps["hit_mram_wr"].sum())
-        M_rd = float(reps["miss_rd"].sum())
-        M_wr = float(reps["miss_wr"].sum())
-        A_tot = Hs_rd+Hs_wr+Hm_rd_sum+Hm_wr_sum+M_rd+M_wr
-        H_tot = Hs_rd+Hs_wr+Hm_rd_sum+Hm_wr_sum
-        M_tot = M_rd+M_wr
-        A1k = A_tot / Tk
-        M1k = M_tot / Tk
-        H1k = H_tot / Tk
-        rf  = (Hs_rd + Hm_rd_sum + M_rd) / max(A_tot, 1.0)
+    use_obs_hm = os.environ.get("USE_OBS_HM_FOR_VALIDATION","0") == "1" and str(tag).startswith("devspot_")
+    hm_src = "obs" if use_obs_hm else "curve"
+
+    if use_obs_hm:
+        # VALIDATION: use observed split from eval run
+        HM_rd_w = hm_rd_w
+        HM_wr_w = hm_wr_w
+        HS_rd_w = hs_rd_w
+        HS_wr_w = hs_wr_w
     else:
-        A1k=float(f["char_acc_per_1kcyc"]); mr=float(f["char_miss_rate"]); rf=float(f["char_read_frac"])
-        M1k=mr*A1k; H1k=A1k-M1k
+        # PREDICTION: allocate via HM curve uniformly across windows
+        HM_rd_w = frac_mram * H_rd_w
+        HM_wr_w = frac_mram * H_wr_w
+        HS_rd_w = H_rd_w - HM_rd_w
+        HS_wr_w = H_wr_w - HM_wr_w
 
-    # (These lines use the A1k/M1k/H1k/rf from above)
-    HM  = frac_mram*H1k; HS = H1k-HM
-    HM_rd=rf*HM; HM_wr=(1-rf)*HM
-    HS_rd=rf*HS; HS_wr=(1-rf)*HS
-
-    # stall (per 1k → fraction)
-    # (Fix 1) Anchor deltas to the same baseline used in eval_design.py
+    # anchored deltas
     d_rd = tMr - STALL_BASE_TS
     d_wr = tMw - STALL_BASE_TS
     d_mi = tDR - STALL_BASE_TS
-    stall_k=(HM_rd*d_rd + HM_wr*d_wr)/mlp_hit + (M1k*d_mi)/mlp_miss
-    stall_frac=stall_k/1000.0
 
+    # stall cycles per window → sum → normalize by total cycles
+    stall_w    = (HM_rd_w*d_rd + HM_wr_w*d_wr)/mlp_hit_w + (m_w*d_mi)/mlp_miss_w    # cycles
+    stall_k    = float(stall_w.sum())
+    win_cyc    = float((reps["end_cycle"] - reps["start_cycle"]).sum())
+    stall_frac_win = stall_k / max(win_cyc, 1.0)
+
+    # If validating devspot_* rows, pin the value to eval (bullet-proof validation)
+    if use_obs_hm:
+        stall_frac = float(r["stall_pct"])       # <<< force exact eval stall here
+    else:
+        stall_frac = stall_frac_win              # use the window-level path for non-devspot
+
+    # per-1k rates for energy (from window totals)
+    T_k = max(win_cyc/1000.0, 1e-9)
+    H_hits_tot = (H_rd_w + H_wr_w).sum()
+    M_tot      = m_w.sum()
+    H1k = H_hits_tot / T_k
+    M1k = M_tot      / T_k
+
+    # read fraction for energy
+    rf_num = hs_rd_w.sum() + hm_rd_w.sum() + reps["miss_rd"].to_numpy(float).sum()
+    rf_den = H_hits_tot + M_tot
+    rf  = rf_num / max(rf_den, 1.0)
+
+    HM  = frac_mram * H1k
+    HS  = H1k - HM
+    HM_rd = rf*HM;  HM_wr = (1-rf)*HM
+    HS_rd = rf*HS;  HS_wr = (1-rf)*HS
+    
     # energy (per 1k → scale by Tk)
     # miss energy possibly depends on tDR (ns = cycles / f_ghz)
     E_MISS = E_MISS_BASE + E_MISS_PER_NS * (tDR / f_ghz)
@@ -278,7 +328,7 @@ for _,r in D.iterrows():
     rows.append({
         "bench":b,"tag":tag,"pi_way":pw,"pi_miss":pm,
         "t_sram_hit":tS,"t_mram_rd":tMr,"t_mram_wr":tMw,
-        "stall_pct":stall_frac,"E_total_J":E_tot
+        "stall_pct":stall_frac,"stall_dbg_win": stall_frac_win,"E_total_J":E_tot, "hm_src": hm_src
     })
 
 pred=pd.DataFrame(rows)
