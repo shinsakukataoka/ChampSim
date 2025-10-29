@@ -98,6 +98,18 @@ def make_validation(cap, profile, outdir, reweight_profile=""):
     ds = load_dataset(cap)
     ph = load_physics(cap, profile)
     m = round_keys(ds).merge(round_keys(ph), on=JOIN, how="inner", suffixes=("_eval","_phys"))
+
+    for col in ("stall_pct_eval","stall_pct_phys"):
+        vmax = m[col].max()
+        if pd.notna(vmax) and vmax > 1.5:  # looks like %, not fraction
+            print(f"[warn] {col} appears to be in %, converting to fraction (/100)")
+            m[col] = m[col] / 100.0
+
+    if os.environ.get("DUMP_VALIDATION_MERGED","") == "1":
+        out_dbg = f"/tmp/merged_validation_L3_{cap}_{profile or 'current'}.csv"
+        m.to_csv(out_dbg, index=False)
+        print(f"[debug] wrote {out_dbg}")
+
     if m.empty:
         raise RuntimeError("No overlap between eval and physics predictions.")
 
@@ -139,6 +151,12 @@ def make_validation(cap, profile, outdir, reweight_profile=""):
     reweight_tag = f"_reweighted_{reweight_profile}" if reweight_profile else ""
     csv = os.path.join(outdir, f"validation_errors_L3_{cap}_{profile or 'current'}{reweight_tag}.csv")
     err.to_csv(csv, index=False)
+    
+    stall_pp = (err["MAE_stall_frac"]*100.0).dropna()
+    ener_pct = (err["MAPE_energy"]*100.0).dropna()
+    print(f"[validation] cap={cap} profile={profile or 'current'} rows={len(err)}  "
+      f"Stall MAE med={stall_pp.median():.2f}pp p90={stall_pp.quantile(0.9):.2f}pp  "
+      f"Energy MAPE med={ener_pct.median():.2f}% p90={ener_pct.quantile(0.9):.2f}%")
 
     # figure: per-bench bars (stall MAE %, energy MAPE %)
     fig, axs = plt.subplots(1,2, figsize=(12,4))

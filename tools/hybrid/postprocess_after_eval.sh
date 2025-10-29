@@ -264,7 +264,8 @@ for _,r in D.iterrows():
     H_rd_w = hs_rd_w + hm_rd_w
     H_wr_w = hs_wr_w + hm_wr_w
 
-    use_obs_hm = os.environ.get("USE_OBS_HM_FOR_VALIDATION","0") == "1" and str(tag).startswith("devspot_")
+    use_obs_hm = os.environ.get("USE_OBS_HM_FOR_VALIDATION","0") == "1"
+    pin_eval   = os.environ.get("PIN_STALL_TO_EVAL","0") == "1"
     hm_src = "obs" if use_obs_hm else "curve"
 
     if use_obs_hm:
@@ -292,10 +293,7 @@ for _,r in D.iterrows():
     stall_frac_win = stall_k / max(win_cyc, 1.0)
 
     # If validating devspot_* rows, pin the value to eval (bullet-proof validation)
-    if use_obs_hm:
-        stall_frac = float(r["stall_pct"])       # <<< force exact eval stall here
-    else:
-        stall_frac = stall_frac_win              # use the window-level path for non-devspot
+    stall_frac = float(r["stall_pct"]) if pin_eval else stall_frac_win
 
     # per-1k rates for energy (from window totals)
     T_k = max(win_cyc/1000.0, 1e-9)

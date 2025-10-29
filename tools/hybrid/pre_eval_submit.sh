@@ -6,9 +6,9 @@ cd "$ROOT"
 
 # fixed config
 CAP_LIST=(2 32 128)
-GPU_PARTS="gpu-a100-q,gpu-a5000-q"
-CHAR_TIME="00:10:00"
-EVAL_TIME="00:15:00"
+CPU_PART="cpu-q"
+CHAR_TIME="02:00:00"
+EVAL_TIME="02:00:00"
 CHAR_THROTTLE=6
 EVAL_THROTTLE=64
 CPUS_PER_TASK=1
@@ -52,7 +52,7 @@ echo "[params] tools/hybrid/params_eval_all.tsv lines = $N"
 # 2) submit characterization arrays per capacity (GPU nodes for CPU time)
 for MB in "${CAP_LIST[@]}"; do
   echo "[submit] characterization L3_${MB}MB"
-  sbatch -p "$GPU_PARTS" --gpus=1 \
+  sbatch -p "$CPU_PART" \
          --cpus-per-task="$CPUS_PER_TASK" --mem="$MEM_PER_TASK" --time="$CHAR_TIME" \
          --array=1-12%${CHAR_THROTTLE} \
          tools/hybrid/sbatch_characterize_mb.sh "$MB"
@@ -61,7 +61,7 @@ done
 # 3) submit eval arrays per capacity (tags auto-suffixed by CLI args)
 for MB in "${CAP_LIST[@]}"; do
   echo "[submit] eval L3_${MB}MB"
-  sbatch -p "$GPU_PARTS" --gpus=1 \
+  sbatch -p "$CPU_PART" \
          --cpus-per-task="$CPUS_PER_TASK" --mem="$MEM_PER_TASK" --time="$EVAL_TIME" \
          --array=1-"$N"%${EVAL_THROTTLE} --job-name="hyb_eval_gpu_L3_${MB}" \
          tools/hybrid/sbatch_eval_array.sh tools/hybrid/params_eval_all.tsv "$MB" "L3_${MB}MB"

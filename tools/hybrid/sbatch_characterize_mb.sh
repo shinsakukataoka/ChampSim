@@ -1,7 +1,7 @@
-#!/usr/bin/env bash
+#!/bin/bash
 #SBATCH --partition=cpu-q
 #SBATCH --job-name=char_mb
-#SBATCH --array=1-12%4             # 12 benches; throttle=4 (tune as you like)
+#SBATCH --array=1-12%4             # 12 benches; throttle=4 (tune as you like)
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=2G
 #SBATCH --time=00:20:00
@@ -20,18 +20,18 @@ mkdir -p "$OUTROOT" "results/tmp/char_${MB}" "logs/slurm"
 
 # Bench list (12)
 BENCHES=(
-  600.perlbench_s-570B
-  602.gcc_s-1850B
-  620.omnetpp_s-874B
-  605.mcf_s-994B
-  623.xalancbmk_s-700B
-  657.xz_s-3167B
-  641.leela_s-1083B
-  631.deepsjeng_s-928B
-  619.lbm_s-2677B
-  621.wrf_s-6673B
-  648.exchange2_s-1247B
-  649.fotonik3d_s-7084B
+  600.perlbench_s-570B
+  602.gcc_s-1850B
+  620.omnetpp_s-874B
+  605.mcf_s-994B
+  623.xalancbmk_s-700B
+  657.xz_s-3167B
+  641.leela_s-1083B
+  631.deepsjeng_s-928B
+  619.lbm_s-2677B
+  621.wrf_s-6673B
+  648.exchange2_s-1247B
+  649.fotonik3d_s-7084B
 )
 
 IDX=$((SLURM_ARRAY_TASK_ID - 1))
@@ -50,29 +50,29 @@ python3 - "$ROOT" "$MB" "$RUN_CWD" <<'PY'
 import sys, json, os
 root, mb, cwd = sys.argv[1], float(sys.argv[2]), sys.argv[3]
 cfg = json.load(open(os.path.join(root,"champsim_config.json")))
-bl   = int(cfg.get("block_size",64))
+bl   = int(cfg.get("block_size",64))
 ways = int(cfg.get("LLC",{}).get("ways",16))
 cfg.setdefault("LLC",{})["sets"] = int((mb*1024*1024)//(bl*ways))
 json.dump(cfg, open(os.path.join(cwd,"champsim_config.json"),"w"), indent=2)
 PY
 
-echo "== characterize: ${BENCH}  (L3=${MB}MB) =="
+echo "== characterize: ${BENCH}  (L3=${MB}MB) =="
 
 # Run ChampSim in the staged CWD
 srun --cpu-bind=cores bash -c "
-  cd '$RUN_CWD' && '$CHAMPSIM_BIN' \
-    --warmup-instructions $WARM \
-    --simulation-instructions $SIM \
-    --hybrid-llc \
-    --pi-way $PIWAY --pi-miss $PIMISS \
-    --t-sram-hit $TS --t-mram-rd $TMR --t-mram-wr $TMW \
-    '$TR/${BENCH}.champsimtrace.xz'
+  cd '$RUN_CWD' && '$CHAMPSIM_BIN' \
+    --warmup-instructions $WARM \
+    --simulation-instructions $SIM \
+    --hybrid-llc \
+    --pi-way $PIWAY --pi-miss $PIMISS \
+    --t-sram-hit $TS --t-mram-rd $TMR --t-mram-wr $TMW \
+    '$TR/${BENCH}.champsimtrace.xz'
 "
 
 OUTDIR="$OUTROOT/$BENCH"
 mkdir -p "$OUTDIR"
 if [[ ! -f "$RUN_CWD/results/LLC.llc.win.csv" ]]; then
-  echo "ERROR: no CSV produced for $BENCH"; exit 2
+  echo "ERROR: no CSV produced for $BENCH"; exit 2
 fi
 
 mv "$RUN_CWD/results/LLC.llc.win.csv" "$OUTDIR/LLC.llc.win.csv"
