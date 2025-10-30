@@ -1,0 +1,17 @@
+{
+  "bench": "605.mcf_s-994B.champsimtrace.xz",
+  "sim_instrs": 20000000,
+
+  "policy": { "pi_miss": 0.8, "pi_way": 0.7 },
+
+  "latency": { "tS": 24, "tMr": 12, "tMw": 80 },
+
+  "energy": {
+    "table": {
+      "sram": { "read_hit_pJ": 100.0, "write_hit_pJ": 80.0,  "leak_mW": 6.0 },
+      "mram": { "read_hit_pJ": 70.0,  "write_hit_pJ": 250.0, "leak_mW": 3.0 },
+      "miss_path": { "per_miss_pJ": 1600.0 }
+    }
+  }
+}
+

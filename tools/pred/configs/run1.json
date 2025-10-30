@@ -1,0 +1,15 @@
+{
+  "bench": "600.perlbench_s-570B.champsimtrace.xz",
+  "sim_instrs": 20000000,
+  "policy": { "pi_miss": 0.6, "pi_way": 0.4 },
+  "latency": { "tS": 16, "tMr": 28, "tMw": 60 },
+
+  "energy": {
+    "table": {
+      "sram":   { "read_hit_pJ": 120.0, "write_hit_pJ": 90.0,  "leak_mW": 5.0 },
+      "mram":   { "read_hit_pJ": 220.0, "write_hit_pJ": 300.0, "leak_mW": 2.0 },
+      "miss_path": { "per_miss_pJ": 1500.0 }
+    }
+  }
+}
+
